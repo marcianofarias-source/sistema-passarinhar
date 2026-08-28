@@ -376,8 +376,8 @@
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
-        // URL oficial configurada para o backend no Render
-        const API_BASE_URL = 'https://sistema-passarinhar.onrender.com';
+        // ALTERE A LINK ABAIXO PARA O LINK REAL GERADO PELO RENDER.COM
+        const API_BASE_URL = 'https://passarinhar-api.onrender.com';
 
         let currentUser = null;
         let map = null;
@@ -394,12 +394,7 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ username, password })
             })
-            .then(res => {
-                if (!res.ok) {
-                    throw new Error(`Servidor retornou erro: ${res.status}`);
-                }
-                return res.json();
-            })
+            .then(res => res.json())
             .then(data => {
                 if (data.success) {
                     currentUser = data.user;
@@ -413,9 +408,6 @@
                 } else {
                     alert(data.message);
                 }
-            })
-            .catch(err => {
-                alert('Erro de conexão com o servidor:\n' + err.message + '\n\nSe for o primeiro acesso, aguarde 30 segundos enquanto a API inicializa no Render e tente novamente.');
             });
         }
 
@@ -460,9 +452,7 @@
             document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
             
             document.getElementById(tabId).classList.add('active');
-            if (event && event.target) {
-                event.target.classList.add('active');
-            }
+            event.target.classList.add('active');
 
             if (tabId === 'mapa') setTimeout(initMap, 200);
         }
