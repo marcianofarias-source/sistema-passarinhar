@@ -7,7 +7,13 @@ const xlsx = require('xlsx');
 const app = express();
 const upload = multer({ dest: 'uploads/' });
 
-app.use(cors());
+// Configuração completa de CORS para liberar requisições do Firebase/qualquer origem
+app.use(cors({
+    origin: '*',
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
 app.use(express.json());
 app.use(express.static('public'));
 
