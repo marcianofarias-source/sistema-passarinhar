@@ -1,15 +1,20 @@
 const express = require('express');
-const cors = require('cors');
+const cors = require('cors'); // <--- 1. Adicione esta linha
+
+const app = express();
+
+app.use(cors()); // <--- 2. Adicione esta linha ANTES de app.use(express.json()) e das rotas
+app.use(express.json());
+const express = require('express');
 const fs = require('fs');
 const path = require('path');
 const multer = require('multer');
 const xlsx = require('xlsx');
 
+
 const app = express();
 const upload = multer({ dest: 'uploads/' });
 
-// Ativação do CORS antes de todas as rotas e middlewares
-app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
