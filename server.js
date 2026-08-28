@@ -1,7 +1,6 @@
 const express = require('express');
 const cors = require('cors');
-const fs = require('fs');
-const path = require('path');
+const mongoose = require('mongoose');
 const multer = require('multer');
 const xlsx = require('xlsx');
 
@@ -10,81 +9,75 @@ const upload = multer({ dest: 'uploads/' });
 
 app.use(cors());
 app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static('public'));
 
-// Arquivos JSON para persistência
-const CLIENTS_FILE = path.join(__dirname, 'clients.json');
-const USERS_FILE = path.join(__dirname, 'users.json');
-const VISITS_FILE = path.join(__dirname, 'visits.json');
+const MONGO_URI = process.env.MONGO_URI || "SUA_STRING_DE_CONEXAO_AQUI";
 
-// --- GERENCIAMENTO DE CLIENTES ---
-function readClients() {
-    if (!fs.existsSync(CLIENTS_FILE)) {
-        fs.writeFileSync(CLIENTS_FILE, JSON.stringify([], null, 2));
-    }
-    const data = fs.readFileSync(CLIENTS_FILE, 'utf-8');
-    try {
-        return JSON.parse(data);
-    } catch (e) {
-        return [];
-    }
-}
+mongoose.connect(MONGO_URI)
+  .then(() => console.log('Conectado ao MongoDB Atlas com sucesso!'))
+  .catch(err => console.error('Erro ao conectar ao MongoDB:', err));
 
-function saveClients(clients) {
-    fs.writeFileSync(CLIENTS_FILE, JSON.stringify(clients, null, 2));
-}
+const userSchema = new mongoose.Schema({
+    id: Number,
+    name: String,
+    username: { type: String, unique: true },
+    password: String,
+    role: String
+});
 
-// --- GERENCIAMENTO DE USUÁRIOS E PERMISSÕES ---
-function readUsers() {
-    if (!fs.existsSync(USERS_FILE)) {
-        const initialUsers = [
-            { 
-                id: 1, 
-                name: 'Administrador', 
-                username: 'admin', 
-                password: 'Amt@1995', 
-                role: 'Administrador' 
-            }
-        ];
-        fs.writeFileSync(USERS_FILE, JSON.stringify(initialUsers, null, 2));
-        return initialUsers;
-    }
-    const data = fs.readFileSync(USERS_FILE, 'utf-8');
-    try {
-        return JSON.parse(data);
-    } catch (e) {
-        return [];
-    }
-}
+const clientSchema = new mongoose.Schema({
+    id: Number,
+    name: String,
+    city: String,
+    address: String,
+    phone: String
+});
 
-function saveUsers(users) {
-    fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
-}
+const visitSchema = new mongoose.Schema({
+    id: Number,
+    clientId: String,
+    clientName: String,
+    clientAddress: String,
+    scheduledDate: String,
+    sellerId: String,
+    sellerName: String,
+    status: { type: String, default: 'Agendada' },
+    notes: String,
+    startTime: String,
+    endTime: String,
+    startLat: Number,
+    startLng: Number,
+    endLat: Number,
+    endLng: Number
+});
 
-// --- GERENCIAMENTO DE VISITAS ---
-function readVisits() {
-    if (!fs.existsSync(VISITS_FILE)) {
-        fs.writeFileSync(VISITS_FILE, JSON.stringify([], null, 2));
-    }
-    const data = fs.readFileSync(VISITS_FILE, 'utf-8');
-    try {
-        return JSON.parse(data);
-    } catch (e) {
-        return [];
-    }
-}
-
-function saveVisits(visits) {
-    fs.writeFileSync(VISITS_FILE, JSON.stringify(visits, null, 2));
-}
+const User = mongoose.model('User', userSchema);
+const Client = mongoose.model('Client', clientSchema);
+const Visit = mongoose.model('Visit', visitSchema);
 
 let activeLocations = {};
 
-// Autenticação
-app.post('/api/login', (req, res) => {
+async function initAdmin() {
+    const adminExists = await User.findOne({ username: 'admin' });
+    if (!adminExists) {
+        await User.create({
+            id: 1,
+            name: 'Administrador',
+            username: 'admin',
+            password: 'Amt@1995',
+            role: 'Administrador'
+        });
+        console.log('Usuário Admin criado por padrão.');
+    }
+}
+initAdmin();
+
+app.post('/api/login', async (req, res) => {
     const { username, password } = req.body;
-    const users = readUsers();
-    const user = users.find(u => u.username.toLowerCase() === username.trim().toLowerCase() && u.password === password);
+    const user = await User.findOne({ 
+        username: new RegExp(`^${username.trim()}$`, 'i'), 
+        password: password 
+    });
     
     if (user) {
         res.json({ success: true, user: { id: user.id, name: user.name, role: user.role } });
@@ -93,92 +86,75 @@ app.post('/api/login', (req, res) => {
     }
 });
 
-// Usuários
-app.get('/api/users', (req, res) => {
-    const users = readUsers();
-    res.json(users.map(u => ({ id: u.id, name: u.name, username: u.username, role: u.role })));
+app.get('/api/users', async (req, res) => {
+    const users = await User.find({}, { password: 0 });
+    res.json(users);
 });
 
-app.post('/api/users', (req, res) => {
-    const users = readUsers();
+app.post('/api/users', async (req, res) => {
+    try {
+        const exists = await User.findOne({ username: new RegExp(`^${req.body.username.trim()}$`, 'i') });
+        if (exists) {
+            return res.status(400).json({ success: false, message: 'Nome de usuário já existe!' });
+        }
 
-    const exists = users.some(u => u.username.toLowerCase() === req.body.username.trim().toLowerCase());
-    if (exists) {
-        return res.status(400).json({ success: false, message: 'Nome de usuário já existe!' });
+        const newUser = await User.create({
+            id: Date.now(),
+            name: req.body.name,
+            username: req.body.username,
+            password: req.body.password,
+            role: req.body.role
+        });
+
+        res.json({ success: true, user: newUser });
+    } catch (e) {
+        res.status(500).json({ success: false, message: 'Erro ao cadastrar usuário' });
     }
-
-    const newUser = { 
-        id: Date.now(), 
-        name: req.body.name,
-        username: req.body.username,
-        password: req.body.password,
-        role: req.body.role
-    };
-
-    users.push(newUser);
-    saveUsers(users);
-
-    res.json({ success: true, user: newUser });
 });
 
-// Clientes
-app.get('/api/clients', (req, res) => {
-    res.json(readClients());
+app.get('/api/clients', async (req, res) => {
+    const clients = await Client.find();
+    res.json(clients);
 });
 
-app.post('/api/clients', (req, res) => {
-    const clients = readClients();
-    const newClient = {
+app.post('/api/clients', async (req, res) => {
+    const newClient = await Client.create({
         id: Date.now(),
         name: req.body.name,
         city: req.body.city,
         address: req.body.address || '',
         phone: req.body.phone || ''
-    };
-    clients.push(newClient);
-    saveClients(clients);
+    });
     res.json({ success: true, client: newClient });
 });
 
-// Importação Excel
-app.post('/api/clients/import', upload.single('file'), (req, res) => {
+app.post('/api/clients/import', upload.single('file'), async (req, res) => {
     if (!req.file) return res.status(400).json({ success: false, message: 'Nenhum arquivo enviado' });
 
     try {
         const workbook = xlsx.readFile(req.file.path);
-        const sheetName = workbook.SheetNames[0];
-        const sheet = workbook.Sheets[sheetName];
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
         const data = xlsx.utils.sheet_to_json(sheet);
 
-        const clients = readClients();
-        data.forEach(row => {
-            clients.push({
-                id: Date.now() + Math.floor(Math.random() * 1000),
-                name: row.Nome || row.nome || row.Name || '',
-                city: row.Cidade || row.cidade || row.City || '',
-                address: row.Endereço || row.Endereco || row.endereço || row.endereco || row.Address || '',
-                phone: row.Telefone || row.telefone || row.Phone || ''
-            });
-        });
+        const clientsToInsert = data.map(row => ({
+            id: Date.now() + Math.floor(Math.random() * 10000),
+            name: row.Nome || row.nome || row.Name || '',
+            city: row.Cidade || row.cidade || row.City || '',
+            address: row.Endereço || row.Endereco || row.address || '',
+            phone: row.Telefone || row.telefone || row.Phone || ''
+        }));
 
-        saveClients(clients);
-        fs.unlinkSync(req.file.path);
-
+        await Client.insertMany(clientsToInsert);
         res.json({ success: true, count: data.length });
     } catch (error) {
-        res.status(500).json({ success: false, message: 'Erro ao processar o arquivo Excel' });
+        res.status(500).json({ success: false, message: 'Erro ao processar Excel' });
     }
 });
 
-// GPS
 app.post('/api/tracking/update', (req, res) => {
     const { sellerId, sellerName, lat, lng } = req.body;
     activeLocations[sellerId] = {
-        sellerId,
-        sellerName,
-        lat,
-        lng,
-        timestamp: new Date().toISOString()
+        sellerId, sellerName, lat, lng, timestamp: new Date().toISOString()
     };
     res.json({ success: true });
 });
@@ -187,27 +163,22 @@ app.get('/api/tracking/active', (req, res) => {
     res.json(Object.values(activeLocations));
 });
 
-// Visitas (Oculta da Agenda as Visitas que foram Concluídas)
-app.get('/api/visits', (req, res) => {
+app.get('/api/visits', async (req, res) => {
     const { sellerId, userRole } = req.query;
-    let visits = readVisits();
-
-    // Filtra para remover visitas concluídas da agenda de exibição
-    visits = visits.filter(v => v.status !== 'Concluída');
+    let filter = { status: { $ne: 'Concluída' } };
 
     if (userRole === 'Vendedor' || (sellerId && sellerId !== 'all')) {
-        return res.json(visits.filter(v => v.sellerId == sellerId));
+        filter.sellerId = sellerId;
     }
     
+    const visits = await Visit.find(filter);
     res.json(visits);
 });
 
-app.post('/api/visits', (req, res) => {
-    const visits = readVisits();
-    const clients = readClients();
-    const client = clients.find(c => c.id == req.body.clientId);
+app.post('/api/visits', async (req, res) => {
+    const client = await Client.findOne({ id: req.body.clientId });
 
-    const newVisit = {
+    const newVisit = await Visit.create({
         id: Date.now(),
         clientId: req.body.clientId,
         clientName: client ? client.name : 'Cliente Não Encontrado',
@@ -215,68 +186,48 @@ app.post('/api/visits', (req, res) => {
         scheduledDate: req.body.scheduledDate,
         sellerId: req.body.sellerId,
         sellerName: req.body.sellerName,
-        status: 'Agendada',
-        notes: '',
-        startTime: null,
-        endTime: null,
-        startLat: null,
-        startLng: null,
-        endLat: null,
-        endLng: null
-    };
-
-    visits.push(newVisit);
-    saveVisits(visits);
+        status: 'Agendada'
+    });
 
     res.json({ success: true, visit: newVisit });
 });
 
-app.put('/api/visits/:id', (req, res) => {
-    const visitId = req.params.id;
-    const visits = readVisits();
-    const index = visits.findIndex(v => v.id == visitId);
-
-    if (index !== -1) {
-        visits[index] = { ...visits[index], ...req.body };
-        saveVisits(visits);
-        res.json({ success: true, visit: visits[index] });
+app.put('/api/visits/:id', async (req, res) => {
+    const visit = await Visit.findOneAndUpdate({ id: req.params.id }, req.body, { new: true });
+    if (visit) {
+        res.json({ success: true, visit });
     } else {
         res.status(404).json({ success: false, message: 'Visita não encontrada' });
     }
 });
 
-// Relatórios
-app.get('/api/reports/summary', (req, res) => {
+app.get('/api/reports/summary', async (req, res) => {
     const { startDate, endDate, sellerId, userRole } = req.query;
-    const visits = readVisits();
 
     if (userRole === 'Vendedor') {
-        return res.status(403).json({ success: false, message: 'Acesso negado aos relatórios.' });
+        return res.status(403).json({ success: false, message: 'Acesso negado.' });
     }
 
-    let filtered = visits;
+    let filter = {};
 
     if (sellerId && sellerId !== 'all') {
-        filtered = filtered.filter(v => v.sellerId == sellerId);
+        filter.sellerId = sellerId;
     }
 
     if (startDate && endDate) {
-        filtered = filtered.filter(v => {
-            const date = v.scheduledDate;
-            return date >= startDate && date <= endDate;
-        });
+        filter.scheduledDate = { $gte: startDate, $lte: endDate };
     }
 
+    const visits = await Visit.find(filter);
+
     res.json({
-        totalVisits: filtered.length,
-        completed: filtered.filter(v => v.status === 'Concluída').length,
-        inProgress: filtered.filter(v => v.status === 'Em Andamento').length,
-        scheduled: filtered.filter(v => v.status === 'Agendada').length,
-        visits: filtered
+        totalVisits: visits.length,
+        completed: visits.filter(v => v.status === 'Concluída').length,
+        inProgress: visits.filter(v => v.status === 'Em Andamento').length,
+        scheduled: visits.filter(v => v.status === 'Agendada').length,
+        visits: visits
     });
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-    console.log(`Servidor Passarinhar rodando na porta ${PORT}`);
-});
+app.listen(PORT, () => console.log(`Servidor rodando na porta ${PORT}`));

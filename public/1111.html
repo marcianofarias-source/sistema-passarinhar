@@ -4,13 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sistema de Visitas Passarinhar</title>
-    
-    <!-- ÍCONES E ATALHOS PARA O CELULAR (PÁSARRINHO VERDE PWA) -->
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%232e8b57'><path d='M21.5 5a1 1 0 0 0-1 .3l-2.4 2.4A9.9 9.9 0 0 0 12 6C6.5 6 2 10.5 2 16a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1c0-3.3 2.7-6 6-6 1.4 0 2.7.5 3.7 1.3l-2.2 2.2a1 1 0 0 0 .7 1.7h6a1 1 0 0 0 1-1V8a1 1 0 0 0-.7-.7z'/></svg>">
-    <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%232e8b57'><path d='M21.5 5a1 1 0 0 0-1 .3l-2.4 2.4A9.9 9.9 0 0 0 12 6C6.5 6 2 10.5 2 16a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1c0-3.3 2.7-6 6-6 1.4 0 2.7.5 3.7 1.3l-2.2 2.2a1 1 0 0 0 .7 1.7h6a1 1 0 0 0 1-1V8a1 1 0 0 0-.7-.7z'/></svg>">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-title" content="Passarinhar">
-
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: Arial, sans-serif; }
@@ -169,7 +162,7 @@
     </div>
 
     <header>
-        <h1>🐦 Sistema de Visitas Passarinhar</h1>
+        <h1>Sistema de Visitas Passarinhar</h1>
         <div>
             <span id="userInfo"></span>
             <button class="btn btn-outline" style="margin-left: 10px; padding: 6px 12px;" onclick="logout()">Sair</button>
@@ -206,7 +199,7 @@
                 <form id="formVisit" onsubmit="handleCreateVisit(event)" style="margin-top: 10px;">
                     <div class="form-group">
                         <label>Buscar Cliente por Nome</label>
-                        <input type="text" id="searchClientInput" placeholder="Digite para filtrar o cliente..." onkeyup="filterClientOptionsFast()" style="margin-bottom: 8px;">
+                        <input type="text" id="searchClientInput" placeholder="Digite para filtrar o cliente..." oninput="filterClientOptions()" style="margin-bottom: 8px;">
                         
                         <label>Selecionar Cliente</label>
                         <select id="visitClientSelect" required></select>
@@ -392,8 +385,8 @@
         let mapMarkers = [];
         let trackingWatchId = null;
         let globalClientsList = [];
-        let searchTimeout = null;
 
+        // Inicializa ao carregar a página para verificar se já existe sessão salva
         window.onload = function() {
             const savedUser = localStorage.getItem('passarinhar_user');
             if (savedUser) {
@@ -414,7 +407,9 @@
             })
             .then(async res => {
                 const data = await res.json();
-                if (!res.ok) throw new Error(data.message || 'Senha ou usuário incorreto!');
+                if (!res.ok) {
+                    throw new Error(data.message || 'Senha ou usuário incorreto!');
+                }
                 return data;
             })
             .then(data => {
@@ -424,7 +419,9 @@
                     initDashboard();
                 }
             })
-            .catch(err => alert(err.message));
+            .catch(err => {
+                alert(err.message);
+            });
         }
 
         function initDashboard() {
@@ -504,41 +501,31 @@
                     </tr>`;
                 });
 
-                renderClientSelectOptions(clients.slice(0, 100)); // Limite otimizado para renderização rápida
+                renderClientSelectOptions(clients);
             });
         }
 
         function renderClientSelectOptions(clients) {
             const select = document.getElementById('visitClientSelect');
-            let options = '';
+            select.innerHTML = '';
 
             if (clients.length === 0) {
                 select.innerHTML = '<option value="">Nenhum cliente encontrado</option>';
                 return;
             }
 
-            for (let i = 0; i < clients.length; i++) {
-                const c = clients[i];
-                options += `<option value="${c.id}">${c.name} - ${c.address ? c.address + ', ' : ''}${c.city}</option>`;
-            }
-            select.innerHTML = options;
+            clients.forEach(c => {
+                select.innerHTML += `<option value="${c.id}">${c.name} - ${c.address ? c.address + ', ' : ''}${c.city}</option>`;
+            });
         }
 
-        // Pesquisa Otimizada e Rápida (Debounce)
-        function filterClientOptionsFast() {
-            clearTimeout(searchTimeout);
-            searchTimeout = setTimeout(() => {
-                const searchTerm = document.getElementById('searchClientInput').value.toLowerCase().trim();
-                if (!searchTerm) {
-                    renderClientSelectOptions(globalClientsList.slice(0, 100));
-                    return;
-                }
-                const filtered = globalClientsList.filter(c => 
-                    c.name.toLowerCase().includes(searchTerm) || 
-                    c.city.toLowerCase().includes(searchTerm)
-                ).slice(0, 100);
-                renderClientSelectOptions(filtered);
-            }, 200);
+        function filterClientOptions() {
+            const searchTerm = document.getElementById('searchClientInput').value.toLowerCase();
+            const filtered = globalClientsList.filter(c => 
+                c.name.toLowerCase().includes(searchTerm) || 
+                c.city.toLowerCase().includes(searchTerm)
+            );
+            renderClientSelectOptions(filtered);
         }
 
         function handleCreateClient(e) {
@@ -646,7 +633,7 @@
                 alert('Visita agendada com sucesso!');
                 form.reset();
                 document.getElementById('searchClientInput').value = '';
-                filterClientOptionsFast();
+                filterClientOptions();
                 loadVisits();
             });
         }
@@ -667,7 +654,7 @@
         }
 
         function endVisit(visitId) {
-            const notes = prompt("Digite uma observação sobre a visita:");
+            const notes = prompt("Digite uma observação sobre a visita (ex: Pedido fechado, Reunião remarcada, etc):");
             if (notes === null) return;
 
             navigator.geolocation.getCurrentPosition(pos => {

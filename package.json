@@ -1,1 +1,1 @@
-{"name":"passarinhar-visitas-web","version":"2.1.0","scripts":{"start":"node server.js"},"dependencies":{"cors":"^2.8.6","express":"^4.22.2","multer":"^2.2.0","xlsx":"^0.18.5"}}
+{"name":"passarinhar-visitas-web","version":"2.1.0","scripts":{"start":"node server.js"},"dependencies":{"cors":"^2.8.6","express":"^4.22.2","mongoose":"^9.9.4","multer":"^2.2.0","xlsx":"^0.18.5"}}
