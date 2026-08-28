@@ -7,8 +7,9 @@ const xlsx = require('xlsx');
 const app = express();
 const upload = multer({ dest: 'uploads/' });
 
+// Configuração do CORS atualizada para permitir o Firebase Hosting
 app.use(cors({
-    origin: '*',
+    origin: ['https://passarinhar-sistema.web.app', 'https://passarinhar-sistema.firebaseapp.com', 'http://localhost:3000'],
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
