@@ -2,151 +2,278 @@ const express = require('express');
 const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
+const multer = require('multer');
+const xlsx = require('xlsx');
 
 const app = express();
+const upload = multer({ dest: 'uploads/' });
+
 app.use(cors());
 app.use(express.json());
+app.use(express.static(path.join(__dirname, 'public')));
 
-const DATA_FILE = path.join(__dirname, 'database.json');
+// Arquivos JSON para persistência
+const CLIENTS_FILE = path.join(__dirname, 'clients.json');
+const USERS_FILE = path.join(__dirname, 'users.json');
+const VISITS_FILE = path.join(__dirname, 'visits.json');
 
-// Função para ler os dados salvos
-function loadData() {
-    if (!fs.existsSync(DATA_FILE)) {
-        const initialData = {
-            users: [
-                { id: 1, name: 'Admin', username: 'admin', password: '123', role: 'Administrador' }
-            ],
-            clients: [],
-            visits: [],
-            tracking: []
-        };
-        fs.writeFileSync(DATA_FILE, JSON.stringify(initialData, null, 2));
-        return initialData;
+// --- GERENCIAMENTO DE CLIENTES ---
+function readClients() {
+    if (!fs.existsSync(CLIENTS_FILE)) {
+        fs.writeFileSync(CLIENTS_FILE, JSON.stringify([], null, 2));
     }
-    const rawData = fs.readFileSync(DATA_FILE);
-    return JSON.parse(rawData);
+    const data = fs.readFileSync(CLIENTS_FILE, 'utf-8');
+    try {
+        return JSON.parse(data);
+    } catch (e) {
+        return [];
+    }
 }
 
-// Função para gravar os dados no arquivo
-function saveData(data) {
-    fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
+function saveClients(clients) {
+    fs.writeFileSync(CLIENTS_FILE, JSON.stringify(clients, null, 2));
 }
 
-// API: LOGIN
+// --- GERENCIAMENTO DE USUÁRIOS E PERMISSÕES ---
+function readUsers() {
+    if (!fs.existsSync(USERS_FILE)) {
+        const initialUsers = [
+            { 
+                id: 1, 
+                name: 'Administrador', 
+                username: 'admin', 
+                password: 'Amt@1995', 
+                role: 'Administrador' 
+            }
+        ];
+        fs.writeFileSync(USERS_FILE, JSON.stringify(initialUsers, null, 2));
+        return initialUsers;
+    }
+    const data = fs.readFileSync(USERS_FILE, 'utf-8');
+    try {
+        return JSON.parse(data);
+    } catch (e) {
+        return [];
+    }
+}
+
+function saveUsers(users) {
+    fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
+}
+
+// --- GERENCIAMENTO DE VISITAS ---
+function readVisits() {
+    if (!fs.existsSync(VISITS_FILE)) {
+        fs.writeFileSync(VISITS_FILE, JSON.stringify([], null, 2));
+    }
+    const data = fs.readFileSync(VISITS_FILE, 'utf-8');
+    try {
+        return JSON.parse(data);
+    } catch (e) {
+        return [];
+    }
+}
+
+function saveVisits(visits) {
+    fs.writeFileSync(VISITS_FILE, JSON.stringify(visits, null, 2));
+}
+
+let activeLocations = {};
+
+// Autenticação
 app.post('/api/login', (req, res) => {
     const { username, password } = req.body;
-    const db = loadData();
-    const user = db.users.find(u => u.username === username && u.password === password);
-
+    const users = readUsers();
+    const user = users.find(u => u.username.toLowerCase() === username.trim().toLowerCase() && u.password === password);
+    
     if (user) {
-        res.json({ success: true, user });
+        res.json({ success: true, user: { id: user.id, name: user.name, role: user.role } });
     } else {
         res.status(401).json({ success: false, message: 'Usuário ou senha incorretos!' });
     }
 });
 
-// API: LISTAR USUÁRIOS
+// Usuários
 app.get('/api/users', (req, res) => {
-    const db = loadData();
-    res.json(db.users);
+    const users = readUsers();
+    res.json(users.map(u => ({ id: u.id, name: u.name, username: u.username, role: u.role })));
 });
 
-// API: CADASTRAR USUÁRIO (Salva permanentemente)
 app.post('/api/users', (req, res) => {
-    const db = loadData();
-    const newUser = { id: Date.now(), ...req.body };
-    db.users.push(newUser);
-    saveData(db);
+    const users = readUsers();
+
+    const exists = users.some(u => u.username.toLowerCase() === req.body.username.trim().toLowerCase());
+    if (exists) {
+        return res.status(400).json({ success: false, message: 'Nome de usuário já existe!' });
+    }
+
+    const newUser = { 
+        id: Date.now(), 
+        name: req.body.name,
+        username: req.body.username,
+        password: req.body.password,
+        role: req.body.role
+    };
+
+    users.push(newUser);
+    saveUsers(users);
+
     res.json({ success: true, user: newUser });
 });
 
-// API: LISTAR CLIENTES
+// Clientes
 app.get('/api/clients', (req, res) => {
-    const db = loadData();
-    res.json(db.clients);
+    res.json(readClients());
 });
 
-// API: CADASTRAR CLIENTE
 app.post('/api/clients', (req, res) => {
-    const db = loadData();
-    const newClient = { id: Date.now(), ...req.body };
-    db.clients.push(newClient);
-    saveData(db);
+    const clients = readClients();
+    const newClient = {
+        id: Date.now(),
+        name: req.body.name,
+        city: req.body.city,
+        address: req.body.address || '',
+        phone: req.body.phone || ''
+    };
+    clients.push(newClient);
+    saveClients(clients);
     res.json({ success: true, client: newClient });
 });
 
-// API: LISTAR VISITAS
-app.get('/api/visits', (req, res) => {
-    const { sellerId } = req.query;
-    const db = loadData();
-    
-    if (sellerId && sellerId !== 'all') {
-        const filtered = db.visits.filter(v => String(v.sellerId) === String(sellerId));
-        return res.json(filtered);
+// Importação Excel
+app.post('/api/clients/import', upload.single('file'), (req, res) => {
+    if (!req.file) return res.status(400).json({ success: false, message: 'Nenhum arquivo enviado' });
+
+    try {
+        const workbook = xlsx.readFile(req.file.path);
+        const sheetName = workbook.SheetNames[0];
+        const sheet = workbook.Sheets[sheetName];
+        const data = xlsx.utils.sheet_to_json(sheet);
+
+        const clients = readClients();
+        data.forEach(row => {
+            clients.push({
+                id: Date.now() + Math.floor(Math.random() * 1000),
+                name: row.Nome || row.nome || row.Name || '',
+                city: row.Cidade || row.cidade || row.City || '',
+                address: row.Endereço || row.Endereco || row.endereço || row.endereco || row.Address || '',
+                phone: row.Telefone || row.telefone || row.Phone || ''
+            });
+        });
+
+        saveClients(clients);
+        fs.unlinkSync(req.file.path);
+
+        res.json({ success: true, count: data.length });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Erro ao processar o arquivo Excel' });
     }
-    res.json(db.visits);
 });
 
-// API: CRIAR VISITA
-app.post('/api/visits', (req, res) => {
-    const db = loadData();
-    const client = db.clients.find(c => String(c.id) === String(req.body.clientId));
+// GPS
+app.post('/api/tracking/update', (req, res) => {
+    const { sellerId, sellerName, lat, lng } = req.body;
+    activeLocations[sellerId] = {
+        sellerId,
+        sellerName,
+        lat,
+        lng,
+        timestamp: new Date().toISOString()
+    };
+    res.json({ success: true });
+});
+
+app.get('/api/tracking/active', (req, res) => {
+    res.json(Object.values(activeLocations));
+});
+
+// Visitas (Persistentes)
+app.get('/api/visits', (req, res) => {
+    const { sellerId, userRole } = req.query;
+    const visits = readVisits();
+
+    if (userRole === 'Vendedor' || (sellerId && sellerId !== 'all')) {
+        return res.json(visits.filter(v => v.sellerId == sellerId));
+    }
     
+    res.json(visits);
+});
+
+app.post('/api/visits', (req, res) => {
+    const visits = readVisits();
+    const clients = readClients();
+    const client = clients.find(c => c.id == req.body.clientId);
+
     const newVisit = {
         id: Date.now(),
-        clientName: client ? client.name : 'Cliente',
+        clientId: req.body.clientId,
+        clientName: client ? client.name : 'Cliente Não Encontrado',
         clientAddress: client ? client.address : '',
+        scheduledDate: req.body.scheduledDate,
+        sellerId: req.body.sellerId,
+        sellerName: req.body.sellerName,
         status: 'Agendada',
-        ...req.body
+        notes: '',
+        startTime: null,
+        endTime: null,
+        startLat: null,
+        startLng: null,
+        endLat: null,
+        endLng: null
     };
-    
-    db.visits.push(newVisit);
-    saveData(db);
+
+    visits.push(newVisit);
+    saveVisits(visits);
+
     res.json({ success: true, visit: newVisit });
 });
 
-// API: ATUALIZAR STATUS DA VISITA
 app.put('/api/visits/:id', (req, res) => {
-    const { id } = req.params;
-    const db = loadData();
-    const index = db.visits.findIndex(v => String(v.id) === String(id));
+    const visitId = req.params.id;
+    const visits = readVisits();
+    const index = visits.findIndex(v => v.id == visitId);
 
     if (index !== -1) {
-        db.visits[index] = { ...db.visits[index], ...req.body };
-        saveData(db);
-        res.json({ success: true, visit: db.visits[index] });
+        visits[index] = { ...visits[index], ...req.body };
+        saveVisits(visits);
+        res.json({ success: true, visit: visits[index] });
     } else {
-        res.status(404).json({ success: false, message: 'Visita não encontrada.' });
+        res.status(404).json({ success: false, message: 'Visita não encontrada' });
     }
 });
 
-// API: RELATÓRIOS
+// Relatórios
 app.get('/api/reports/summary', (req, res) => {
-    const { startDate, endDate, sellerId } = req.query;
-    const db = loadData();
+    const { startDate, endDate, sellerId, userRole } = req.query;
+    const visits = readVisits();
 
-    let filtered = db.visits;
+    if (userRole === 'Vendedor') {
+        return res.status(403).json({ success: false, message: 'Acesso negado aos relatórios.' });
+    }
+
+    let filtered = visits;
 
     if (sellerId && sellerId !== 'all') {
-        filtered = filtered.filter(v => String(v.sellerId) === String(sellerId));
+        filtered = filtered.filter(v => v.sellerId == sellerId);
     }
 
     if (startDate && endDate) {
-        filtered = filtered.filter(v => v.scheduledDate >= startDate && v.scheduledDate <= endDate);
+        filtered = filtered.filter(v => {
+            const date = v.scheduledDate;
+            return date >= startDate && date <= endDate;
+        });
     }
-
-    const completed = filtered.filter(v => v.status === 'Concluída').length;
-    const inProgress = filtered.filter(v => v.status === 'Em Andamento').length;
-    const scheduled = filtered.filter(v => v.status === 'Agendada').length;
 
     res.json({
         totalVisits: filtered.length,
-        completed,
-        inProgress,
-        scheduled,
+        completed: filtered.filter(v => v.status === 'Concluída').length,
+        inProgress: filtered.filter(v => v.status === 'Em Andamento').length,
+        scheduled: filtered.filter(v => v.status === 'Agendada').length,
         visits: filtered
     });
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Servidor rodando na porta ${PORT}`));
+app.listen(PORT, () => {
+    console.log(`Servidor Passarinhar rodando na porta ${PORT}`);
+});
