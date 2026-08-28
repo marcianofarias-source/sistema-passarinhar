@@ -198,10 +198,7 @@
                 <h3>Agendar Nova Visita</h3>
                 <form id="formVisit" onsubmit="handleCreateVisit(event)" style="margin-top: 10px;">
                     <div class="form-group">
-                        <label>Buscar Cliente por Nome</label>
-                        <input type="text" id="searchClientInput" placeholder="Digite para filtrar o cliente..." oninput="filterClientOptions()" style="margin-bottom: 8px;">
-                        
-                        <label>Selecionar Cliente</label>
+                        <label>Cliente</label>
                         <select id="visitClientSelect" required></select>
                     </div>
                     <div class="form-group">
@@ -384,7 +381,6 @@
         let map = null;
         let mapMarkers = [];
         let trackingWatchId = null;
-        let globalClientsList = [];
 
         function login(e) {
             if (e) e.preventDefault();
@@ -473,9 +469,10 @@
             fetch(`${API_BASE_URL}/api/clients`)
             .then(res => res.json())
             .then(clients => {
-                globalClientsList = clients;
                 const tbody = document.getElementById('clientsTableBody');
+                const select = document.getElementById('visitClientSelect');
                 tbody.innerHTML = '';
+                select.innerHTML = '';
 
                 clients.forEach(c => {
                     tbody.innerHTML += `<tr>
@@ -485,33 +482,10 @@
                         <td>${c.address || '-'}</td>
                         <td>${c.phone || '-'}</td>
                     </tr>`;
+
+                    select.innerHTML += `<option value="${c.id}">${c.name} - ${c.address ? c.address + ', ' : ''}${c.city}</option>`;
                 });
-
-                renderClientSelectOptions(clients);
             });
-        }
-
-        function renderClientSelectOptions(clients) {
-            const select = document.getElementById('visitClientSelect');
-            select.innerHTML = '';
-
-            if (clients.length === 0) {
-                select.innerHTML = '<option value="">Nenhum cliente encontrado</option>';
-                return;
-            }
-
-            clients.forEach(c => {
-                select.innerHTML += `<option value="${c.id}">${c.name} - ${c.address ? c.address + ', ' : ''}${c.city}</option>`;
-            });
-        }
-
-        function filterClientOptions() {
-            const searchTerm = document.getElementById('searchClientInput').value.toLowerCase();
-            const filtered = globalClientsList.filter(c => 
-                c.name.toLowerCase().includes(searchTerm) || 
-                c.city.toLowerCase().includes(searchTerm)
-            );
-            renderClientSelectOptions(filtered);
         }
 
         function handleCreateClient(e) {
