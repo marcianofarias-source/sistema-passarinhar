@@ -187,13 +187,10 @@ app.get('/api/tracking/active', (req, res) => {
     res.json(Object.values(activeLocations));
 });
 
-// Visitas (Oculta da Agenda as Visitas que foram Concluídas)
+// Visitas (Persistentes)
 app.get('/api/visits', (req, res) => {
     const { sellerId, userRole } = req.query;
-    let visits = readVisits();
-
-    // Filtra para remover visitas concluídas da agenda de exibição
-    visits = visits.filter(v => v.status !== 'Concluída');
+    const visits = readVisits();
 
     if (userRole === 'Vendedor' || (sellerId && sellerId !== 'all')) {
         return res.json(visits.filter(v => v.sellerId == sellerId));
