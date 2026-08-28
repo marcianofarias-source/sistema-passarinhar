@@ -7,12 +7,7 @@ const xlsx = require('xlsx');
 const app = express();
 const upload = multer({ dest: 'uploads/' });
 
-app.use(cors({
-    origin: '*',
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization']
-}));
-
+app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
 
@@ -77,7 +72,6 @@ async function initAdmin() {
 }
 initAdmin();
 
-// --- AUTENTICAÇÃO ---
 app.post('/api/login', async (req, res) => {
     const { username, password } = req.body;
     const user = await User.findOne({ 
@@ -92,7 +86,6 @@ app.post('/api/login', async (req, res) => {
     }
 });
 
-// --- USUÁRIOS / VENDEDORES ---
 app.get('/api/users', async (req, res) => {
     const users = await User.find({}, { password: 0 });
     res.json(users);
@@ -101,7 +94,9 @@ app.get('/api/users', async (req, res) => {
 app.post('/api/users', async (req, res) => {
     try {
         const exists = await User.findOne({ username: new RegExp(`^${req.body.username.trim()}$`, 'i') });
-        if (exists) return res.status(400).json({ success: false, message: 'Nome de usuário já existe!' });
+        if (exists) {
+            return res.status(400).json({ success: false, message: 'Nome de usuário já existe!' });
+        }
 
         const newUser = await User.create({
             id: Date.now(),
@@ -117,37 +112,6 @@ app.post('/api/users', async (req, res) => {
     }
 });
 
-app.put('/api/users/:id', async (req, res) => {
-    try {
-        const updateData = {
-            name: req.body.name,
-            username: req.body.username,
-            role: req.body.role
-        };
-        if (req.body.password && req.body.password.trim() !== '') {
-            updateData.password = req.body.password;
-        }
-
-        const updatedUser = await User.findOneAndUpdate({ id: req.params.id }, updateData, { new: true, select: '-password' });
-        if (!updatedUser) return res.status(404).json({ success: false, message: 'Usuário não encontrado' });
-
-        res.json({ success: true, user: updatedUser });
-    } catch (error) {
-        res.status(500).json({ success: false, message: 'Erro ao atualizar usuário' });
-    }
-});
-
-app.delete('/api/users/:id', async (req, res) => {
-    try {
-        const deletedUser = await User.findOneAndDelete({ id: req.params.id });
-        if (!deletedUser) return res.status(404).json({ success: false, message: 'Usuário não encontrado' });
-        res.json({ success: true, message: 'Usuário excluído com sucesso!' });
-    } catch (error) {
-        res.status(500).json({ success: false, message: 'Erro ao excluir usuário' });
-    }
-});
-
-// --- CLIENTES ---
 app.get('/api/clients', async (req, res) => {
     const clients = await Client.find();
     res.json(clients);
@@ -164,35 +128,6 @@ app.post('/api/clients', async (req, res) => {
     res.json({ success: true, client: newClient });
 });
 
-app.put('/api/clients/:id', async (req, res) => {
-    try {
-        const updatedClient = await Client.findOneAndUpdate(
-            { id: req.params.id },
-            {
-                name: req.body.name,
-                city: req.body.city,
-                address: req.body.address,
-                phone: req.body.phone
-            },
-            { new: true }
-        );
-        if (!updatedClient) return res.status(404).json({ success: false, message: 'Cliente não encontrado' });
-        res.json({ success: true, client: updatedClient });
-    } catch (error) {
-        res.status(500).json({ success: false, message: 'Erro ao atualizar cliente' });
-    }
-});
-
-app.delete('/api/clients/:id', async (req, res) => {
-    try {
-        const deletedClient = await Client.findOneAndDelete({ id: req.params.id });
-        if (!deletedClient) return res.status(404).json({ success: false, message: 'Cliente não encontrado' });
-        res.json({ success: true, message: 'Cliente excluído com sucesso!' });
-    } catch (error) {
-        res.status(500).json({ success: false, message: 'Erro ao excluir cliente' });
-    }
-});
-
 app.post('/api/clients/import', upload.single('file'), async (req, res) => {
     if (!req.file) return res.status(400).json({ success: false, message: 'Nenhum arquivo enviado' });
 
@@ -201,40 +136,21 @@ app.post('/api/clients/import', upload.single('file'), async (req, res) => {
         const sheet = workbook.Sheets[workbook.SheetNames[0]];
         const data = xlsx.utils.sheet_to_json(sheet);
 
-        const clientsToInsert = data.map(row => {
-            const name = row['Razão Social'] || row['Razao Social'] || row['Nome'] || row['nome'] || row['Name'] || '';
-            const phone = row['Fone Resid'] || row['Fone'] || row['Telefone'] || row['telefone'] || row['Phone'] || row['Celular'] || '';
-            const city = row['Cidade'] || row['cidade'] || row['City'] || '';
-            const uf = row['UF'] || row['uf'] || '';
-            const fullCity = (city && uf) ? `${city} - ${uf}` : (city || uf || '');
-            const street = row['Endereço'] || row['Endereco'] || row['address'] || '';
-            const neighborhood = row['Bairro'] || row['bairro'] || '';
-            const cep = row['CEP'] || row['cep'] || '';
-            
-            let fullAddress = street;
-            if (neighborhood) fullAddress += fullAddress ? `, Bairro: ${neighborhood}` : neighborhood;
-            if (cep) fullAddress += fullAddress ? `, CEP: ${cep}` : `CEP: ${cep}`;
-
-            const customId = row['Código do Cliente'] || row['Codigo do Cliente'] || (Date.now() + Math.floor(Math.random() * 10000));
-
-            return {
-                id: customId,
-                name: String(name).trim(),
-                city: String(fullCity).trim(),
-                address: String(fullAddress).trim(),
-                phone: String(phone).trim()
-            };
-        }).filter(c => c.name !== '');
+        const clientsToInsert = data.map(row => ({
+            id: Date.now() + Math.floor(Math.random() * 10000),
+            name: row.Nome || row.nome || row.Name || '',
+            city: row.Cidade || row.cidade || row.City || '',
+            address: row.Endereço || row.Endereco || row.address || '',
+            phone: row.Telefone || row.telefone || row.Phone || ''
+        }));
 
         await Client.insertMany(clientsToInsert);
-        res.json({ success: true, count: clientsToInsert.length });
+        res.json({ success: true, count: data.length });
     } catch (error) {
-        console.error(error);
         res.status(500).json({ success: false, message: 'Erro ao processar Excel' });
     }
 });
 
-// --- RASTREAMENTO E VISITAS ---
 app.post('/api/tracking/update', (req, res) => {
     const { sellerId, sellerName, lat, lng } = req.body;
     activeLocations[sellerId] = {
