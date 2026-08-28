@@ -1,24 +1,14 @@
 const express = require('express');
-const cors = require('cors'); // <--- 1. Adicione esta linha
-const app = express();
-const express = require('express');
 const cors = require('cors');
-const app = express();
-
-app.use(cors());
-app.use(express.json());
-app.use(cors()); // <--- 2. Adicione esta linha ANTES de app.use(express.json()) e das rotas
-app.use(express.json());
-const express = require('express');
 const fs = require('fs');
 const path = require('path');
 const multer = require('multer');
 const xlsx = require('xlsx');
 
-
 const app = express();
 const upload = multer({ dest: 'uploads/' });
 
+app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -40,14 +30,13 @@ function saveClients(clients) {
     fs.writeFileSync(CLIENTS_FILE, JSON.stringify(clients, null, 2));
 }
 
-let users = [
-    // Localize the list of users and replace with this structure:
+// Apenas o usuário Administrador com a nova senha Amt@1995
 let users = [
   { 
     id: 1, 
     name: 'Administrador', 
     username: 'admin', 
-    password: 'Amt@10', // coloque a senha que você deseja usar
+    password: 'Amt@1995', 
     role: 'Administrador' 
   }
 ];
@@ -77,7 +66,7 @@ app.post('/api/users', (req, res) => {
         id: Date.now(), 
         name: req.body.name,
         username: req.body.username,
-        password: req.body.password || '123',
+        password: req.body.password,
         role: req.body.role
     };
     users.push(newUser);

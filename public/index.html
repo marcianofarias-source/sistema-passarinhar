@@ -36,7 +36,7 @@
             padding: 20px; 
             max-width: 1200px; 
             margin: 0 auto; 
-            padding-bottom: 70px; /* Garante que o rodapé não cubra os botões finais */
+            padding-bottom: 70px;
         }
         .tab-content { display: none; }
         .tab-content.active { display: block; }
@@ -126,7 +126,6 @@
             border-top: 6px solid #3cb371;
         }
 
-        /* Estilo do Rodapé Fixo */
         footer {
             background-color: #2e8b57;
             color: white;
@@ -151,11 +150,11 @@
             <form onsubmit="login(event)">
                 <div class="form-group">
                     <label>Usuário</label>
-                    <input type="text" id="loginUsername" placeholder="Ex: admin" required>
+                    <input type="text" id="loginUsername" placeholder="Digite seu usuário" required>
                 </div>
                 <div class="form-group">
                     <label>Senha</label>
-                    <input type="password" id="loginPassword" placeholder="Senha (Padrão: 123)" required>
+                    <input type="password" id="loginPassword" placeholder="Digite sua senha" required>
                 </div>
                 <button type="submit" class="btn" style="width: 100%; margin-top: 10px;">Entrar</button>
             </form>
@@ -376,7 +375,6 @@
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
-        // URL oficial configurada para o backend no Render
         const API_BASE_URL = 'https://sistema-passarinhar.onrender.com';
 
         let currentUser = null;
@@ -415,7 +413,7 @@
                 }
             })
             .catch(err => {
-                alert('Erro de conexão com o servidor:\n' + err.message + '\n\nSe for o primeiro acesso, aguarde 30 segundos enquanto a API inicializa no Render e tente novamente.');
+                alert('Erro de conexão com o servidor:\n' + err.message);
             });
         }
 
@@ -764,7 +762,6 @@
         }
     </script>
 
-    <!-- RODAPÉ FIXO EM TODAS AS PÁGINAS -->
     <footer>
         Desenvolvido por Marciano Chibanca
     </footer>

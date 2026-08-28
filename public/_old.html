@@ -376,6 +376,9 @@
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
+        // URL oficial configurada para o backend no Render
+        const API_BASE_URL = 'https://sistema-passarinhar.onrender.com';
+
         let currentUser = null;
         let map = null;
         let mapMarkers = [];
@@ -386,12 +389,17 @@
             const username = document.getElementById('loginUsername').value;
             const password = document.getElementById('loginPassword').value;
 
-            fetch('/api/login', {
+            fetch(`${API_BASE_URL}/api/login`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ username, password })
             })
-            .then(res => res.json())
+            .then(res => {
+                if (!res.ok) {
+                    throw new Error(`Servidor retornou erro: ${res.status}`);
+                }
+                return res.json();
+            })
             .then(data => {
                 if (data.success) {
                     currentUser = data.user;
@@ -405,6 +413,9 @@
                 } else {
                     alert(data.message);
                 }
+            })
+            .catch(err => {
+                alert('Erro de conexão com o servidor:\n' + err.message + '\n\nSe for o primeiro acesso, aguarde 30 segundos enquanto a API inicializa no Render e tente novamente.');
             });
         }
 
@@ -423,7 +434,7 @@
         }
 
         function loadUsersList() {
-            fetch('/api/users')
+            fetch(`${API_BASE_URL}/api/users`)
             .then(res => res.json())
             .then(users => {
                 const sellers = users.filter(u => u.role === 'Vendedor');
@@ -449,13 +460,15 @@
             document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
             
             document.getElementById(tabId).classList.add('active');
-            event.target.classList.add('active');
+            if (event && event.target) {
+                event.target.classList.add('active');
+            }
 
             if (tabId === 'mapa') setTimeout(initMap, 200);
         }
 
         function loadClients() {
-            fetch('/api/clients')
+            fetch(`${API_BASE_URL}/api/clients`)
             .then(res => res.json())
             .then(clients => {
                 const tbody = document.getElementById('clientsTableBody');
@@ -486,7 +499,7 @@
                 phone: document.getElementById('clientPhone').value
             };
 
-            fetch('/api/clients', {
+            fetch(`${API_BASE_URL}/api/clients`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(client)
@@ -503,7 +516,7 @@
             const formData = new FormData();
             formData.append('file', fileInput.files[0]);
 
-            fetch('/api/clients/import', { method: 'POST', body: formData })
+            fetch(`${API_BASE_URL}/api/clients/import`, { method: 'POST', body: formData })
             .then(res => res.json())
             .then(data => {
                 if (data.success) {
@@ -522,7 +535,7 @@
                 targetSeller = document.getElementById('agendaSellerFilter').value;
             }
 
-            const url = `/api/visits?sellerId=${targetSeller}`;
+            const url = `${API_BASE_URL}/api/visits?sellerId=${targetSeller}`;
             fetch(url)
             .then(res => res.json())
             .then(visits => {
@@ -565,7 +578,7 @@
                 assignedSellerName = select.options[select.selectedIndex].text;
             }
 
-            fetch('/api/visits', {
+            fetch(`${API_BASE_URL}/api/visits`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -582,7 +595,7 @@
 
         function startVisit(visitId) {
             navigator.geolocation.getCurrentPosition(pos => {
-                fetch(`/api/visits/${visitId}`, {
+                fetch(`${API_BASE_URL}/api/visits/${visitId}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -600,7 +613,7 @@
             if (notes === null) return;
 
             navigator.geolocation.getCurrentPosition(pos => {
-                fetch(`/api/visits/${visitId}`, {
+                fetch(`${API_BASE_URL}/api/visits/${visitId}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -630,7 +643,7 @@
                 sellerId = document.getElementById('reportSellerSelect').value;
             }
 
-            fetch(`/api/reports/summary?startDate=${start}&endDate=${end}&sellerId=${sellerId}`)
+            fetch(`${API_BASE_URL}/api/reports/summary?startDate=${start}&endDate=${end}&sellerId=${sellerId}`)
             .then(res => res.json())
             .then(data => {
                 document.getElementById('metricTotal').innerText = data.totalVisits;
@@ -682,7 +695,7 @@
             } else {
                 trackingWatchId = navigator.geolocation.watchPosition(pos => {
                     status.innerText = `Rastreamento Ativo (${pos.coords.latitude.toFixed(4)}, ${pos.coords.longitude.toFixed(4)})`;
-                    fetch('/api/tracking/update', {
+                    fetch(`${API_BASE_URL}/api/tracking/update`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
@@ -707,7 +720,7 @@
         }
 
         function updateMapLocations() {
-            fetch('/api/tracking/active')
+            fetch(`${API_BASE_URL}/api/tracking/active`)
             .then(res => res.json())
             .then(locations => {
                 mapMarkers.forEach(m => map.removeLayer(m));
@@ -720,7 +733,7 @@
                 });
             });
 
-            fetch('/api/visits')
+            fetch(`${API_BASE_URL}/api/visits`)
             .then(res => res.json())
             .then(visits => {
                 visits.forEach(v => {
@@ -735,7 +748,7 @@
 
         function handleCreateUser(e) {
             e.preventDefault();
-            fetch('/api/users', {
+            fetch(`${API_BASE_URL}/api/users`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({

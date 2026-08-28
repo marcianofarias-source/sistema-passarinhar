@@ -1,8 +1,12 @@
 const express = require('express');
 const cors = require('cors'); // <--- 1. Adicione esta linha
-
+const app = express();
+const express = require('express');
+const cors = require('cors');
 const app = express();
 
+app.use(cors());
+app.use(express.json());
 app.use(cors()); // <--- 2. Adicione esta linha ANTES de app.use(express.json()) e das rotas
 app.use(express.json());
 const express = require('express');
@@ -37,10 +41,15 @@ function saveClients(clients) {
 }
 
 let users = [
-    { id: 1, name: 'Administrador', username: 'admin', password: '123', role: 'Administrador' },
-    { id: 2, name: 'Supervisor 1', username: 'sup1', password: '123', role: 'Supervisor' },
-    { id: 3, name: 'João Silva', username: 'vendedor1', password: '123', role: 'Vendedor' },
-    { id: 4, name: 'Maria Souza', username: 'vendedor2', password: '123', role: 'Vendedor' }
+    // Localize the list of users and replace with this structure:
+let users = [
+  { 
+    id: 1, 
+    name: 'Administrador', 
+    username: 'admin', 
+    password: 'Amt@10', // coloque a senha que você deseja usar
+    role: 'Administrador' 
+  }
 ];
 
 let visits = [];
