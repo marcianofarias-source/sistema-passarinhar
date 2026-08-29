@@ -140,32 +140,6 @@ app.put('/api/users/:id', async (req, res) => {
     }
 });
 
-// ROTAS DE CLIENTES
-app.get('/api/clients', async (req, res) => {
-    try {
-        // Removida a trava do .limit() para retornar TODOS os clientes salvos no banco de dados
-        const clients = await Client.find().sort({ id: -1 }).lean();
-        res.json(clients);
-    } catch (error) {
-        res.status(500).json({ success: false, message: 'Erro ao buscar clientes' });
-    }
-});
-
-app.post('/api/clients', async (req, res) => {
-    try {
-        const newClient = await Client.create({
-            id: Date.now(),
-            name: req.body.name,
-            city: req.body.city,
-            address: req.body.address,
-            phone: req.body.phone
-        });
-        res.json({ success: true, client: newClient });
-    } catch (error) {
-        res.status(500).json({ success: false, message: 'Erro ao cadastrar cliente' });
-    }
-});
-
 app.post('/api/clients/import', upload.single('file'), async (req, res) => {
     if (!req.file) return res.status(400).json({ success: false, message: 'Nenhum arquivo enviado' });
 
@@ -216,6 +190,32 @@ app.post('/api/clients/import', upload.single('file'), async (req, res) => {
     } catch (error) {
         if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
         res.status(500).json({ success: false, message: 'Erro ao processar arquivo: ' + error.message });
+    }
+});
+
+app.post('/api/clients/import', upload.single('file'), async (req, res) => {
+    if (!req.file) return res.status(400).json({ success: false, message: 'Nenhum arquivo enviado' });
+
+    try {
+        const workbook = xlsx.readFile(req.file.path);
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const data = xlsx.utils.sheet_to_json(sheet);
+
+        const baseTimestamp = Date.now();
+        const clientsToInsert = data.map((row, index) => ({
+            id: baseTimestamp + index,
+            name: row.Nome || row.nome || row.Name || '',
+            city: row.Cidade || row.cidade || row.City || '',
+            address: row.Endereço || row.Endereco || row.address || '',
+            phone: row.Telefone || row.telefone || row.Phone || ''
+        }));
+
+        await Client.insertMany(clientsToInsert, { ordered: false });
+        fs.unlinkSync(req.file.path);
+        res.json({ success: true, count: data.length });
+    } catch (error) {
+        if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+        res.status(500).json({ success: false, message: 'Erro ao processar Excel' });
     }
 });
 

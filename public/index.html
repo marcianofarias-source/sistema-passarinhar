@@ -176,11 +176,11 @@
     </header>
 
     <nav>
-        <button class="nav-btn active" onclick="switchTab('agenda', event)">Agenda de Visitas</button>
-        <button class="nav-btn" onclick="switchTab('clientes', event)">Clientes</button>
-        <button class="nav-btn manager-only" onclick="switchTab('relatorios', event)">Relatórios</button>
-        <button class="nav-btn manager-only" onclick="switchTab('mapa', event)">Mapa & Rota GPS</button>
-        <button class="nav-btn admin-only" onclick="switchTab('usuarios', event)">Cadastrar Usuários</button>
+        <button class="nav-btn active" onclick="switchTab('agenda')">Agenda de Visitas</button>
+        <button class="nav-btn" onclick="switchTab('clientes')">Clientes</button>
+        <button class="nav-btn manager-only" onclick="switchTab('relatorios')">Relatórios</button>
+        <button class="nav-btn manager-only" onclick="switchTab('mapa')">Mapa & Rota GPS</button>
+        <button class="nav-btn admin-only" onclick="switchTab('usuarios')">Cadastrar Usuários</button>
     </nav>
 
     <div class="container">
@@ -260,7 +260,7 @@
             </div>
 
             <div class="card">
-                <h3>Lista de Clientes (<span id="clientCounter">0</span>)</h3>
+                <h3>Lista de Clientes</h3>
                 <table>
                     <thead>
                         <tr>
@@ -490,6 +490,7 @@
                 reportFilter.innerHTML = optionsHtml;
                 visitSellerSelect.innerHTML = sellersOptionsHtml;
 
+                // Preenche a Tabela de Gerenciamento de Usuários
                 const usersTbody = document.getElementById('usersTableBody');
                 if (usersTbody) {
                     let rowsHtml = '';
@@ -543,50 +544,41 @@
             .catch(() => alert('Erro na comunicação com o servidor.'));
         }
 
-        function switchTab(tabId, evt) {
+        function switchTab(tabId) {
             document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
             document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
             
             document.getElementById(tabId).classList.add('active');
-            if (evt && evt.target) {
-                evt.target.classList.add('active');
+            if (event && event.target) {
+                event.target.classList.add('active');
             }
 
             if (tabId === 'mapa') setTimeout(initMap, 200);
         }
 
-        // CARREGAMENTO OTIMIZADO DE TODOS OS CLIENTES (SEM TRAVAR A TELA)
         function loadClients() {
-            fetch(`${API_BASE_URL}/api/clients`)
+            fetch(`${API_BASE_URL}/api/clients?limit=200`)
             .then(res => res.json())
             .then(clients => {
                 globalClientsList = clients;
-                
-                const counterEl = document.getElementById('clientCounter');
-                if (counterEl) counterEl.innerText = clients.length;
-
                 const tbody = document.getElementById('clientsTableBody');
-                const fragment = document.createDocumentFragment();
-
-                for (let i = 0; i < clients.length; i++) {
+                
+                let rows = '';
+                const renderLimit = Math.min(clients.length, 100);
+                for (let i = 0; i < renderLimit; i++) {
                     const c = clients[i];
-                    const tr = document.createElement('tr');
-                    tr.innerHTML = `
-                        <td>${c.id || '-'}</td>
-                        <td>${c.name || '-'}</td>
-                        <td>${c.city || '-'}</td>
+                    rows += `<tr>
+                        <td>${c.id}</td>
+                        <td>${c.name}</td>
+                        <td>${c.city}</td>
                         <td>${c.address || '-'}</td>
                         <td>${c.phone || '-'}</td>
-                    `;
-                    fragment.appendChild(tr);
+                    </tr>`;
                 }
-
-                tbody.innerHTML = '';
-                tbody.appendChild(fragment);
+                tbody.innerHTML = rows;
 
                 renderClientSelectOptions(clients.slice(0, 100));
-            })
-            .catch(err => console.error('Erro ao carregar clientes:', err));
+            });
         }
 
         function renderClientSelectOptions(clients) {
@@ -604,28 +596,19 @@
             select.innerHTML = options;
         }
 
-        // FUNÇÃO DE BUSCA CORRIGIDA (BUSCA EM TODOS OS CLIENTES SEM TRAVAR)
         function filterClientOptionsFast() {
             clearTimeout(searchTimeout);
             searchTimeout = setTimeout(() => {
                 const searchTerm = document.getElementById('searchClientInput').value.toLowerCase().trim();
-                
-                // Se o campo estiver vazio, carrega os 100 primeiros clientes padrão
                 if (!searchTerm) {
                     renderClientSelectOptions(globalClientsList.slice(0, 100));
                     return;
                 }
-
-                // Filtra em TODOS os clientes cadastrados no banco (sem usar slice antes)
-                const filtered = globalClientsList.filter(c => {
-                    const nameMatch = c.name && c.name.toLowerCase().includes(searchTerm);
-                    const cityMatch = c.city && c.city.toLowerCase().includes(searchTerm);
-                    const addressMatch = c.address && c.address.toLowerCase().includes(searchTerm);
-                    return nameMatch || cityMatch || addressMatch;
-                });
-
-                // Limita a exibição aos 100 primeiros correspondentes encontrados
-                renderClientSelectOptions(filtered.slice(0, 100));
+                const filtered = globalClientsList.filter(c => 
+                    c.name.toLowerCase().includes(searchTerm) || 
+                    c.city.toLowerCase().includes(searchTerm)
+                ).slice(0, 100);
+                renderClientSelectOptions(filtered);
             }, 150);
         }
 
