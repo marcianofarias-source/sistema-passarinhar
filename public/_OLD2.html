@@ -8,6 +8,7 @@
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%232e8b57'><path d='M21.5 5a1 1 0 0 0-1 .3l-2.4 2.4A9.9 9.9 0 0 0 12 6C6.5 6 2 10.5 2 16a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1c0-3.3 2.7-6 6-6 1.4 0 2.7.5 3.7 1.3l-2.2 2.2a1 1 0 0 0 .7 1.7h6a1 1 0 0 0 1-1V8a1 1 0 0 0-.7-.7z'/></svg>">
     <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%232e8b57'><path d='M21.5 5a1 1 0 0 0-1 .3l-2.4 2.4A9.9 9.9 0 0 0 12 6C6.5 6 2 10.5 2 16a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1c0-3.3 2.7-6 6-6 1.4 0 2.7.5 3.7 1.3l-2.2 2.2a1 1 0 0 0 .7 1.7h6a1 1 0 0 0 1-1V8a1 1 0 0 0-.7-.7z'/></svg>">
     
+    <!-- Meta tag atualizada para PWA / Web Apps -->
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-title" content="Passarinhar">
@@ -401,10 +402,6 @@
 
     </div>
 
-    <footer>
-        Sistema Passarinhar &copy; 2026 - Gestão Integrada de Campo
-    </footer>
-
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         const API_BASE_URL = 'https://sistema-passarinhar.onrender.com';
@@ -492,9 +489,9 @@
                     sellersOptionsHtml += `<option value="${s.id}">${s.name}</option>`;
                 });
 
-                if (agendaFilter) agendaFilter.innerHTML = optionsHtml;
-                if (reportFilter) reportFilter.innerHTML = optionsHtml;
-                if (visitSellerSelect) visitSellerSelect.innerHTML = sellersOptionsHtml;
+                agendaFilter.innerHTML = optionsHtml;
+                reportFilter.innerHTML = optionsHtml;
+                visitSellerSelect.innerHTML = sellersOptionsHtml;
 
                 const usersTbody = document.getElementById('usersTableBody');
                 if (usersTbody) {
@@ -515,36 +512,7 @@
                     });
                     usersTbody.innerHTML = rowsHtml || '<tr><td colspan="4" style="text-align: center;">Nenhum usuário cadastrado.</td></tr>';
                 }
-            })
-            .catch(err => console.error('Erro ao carregar usuários:', err));
-        }
-
-        function handleCreateUser(e) {
-            e.preventDefault();
-            const form = e.target;
-            const newUser = {
-                name: document.getElementById('userName').value,
-                username: document.getElementById('userUsername').value,
-                password: document.getElementById('userPassword').value,
-                role: document.getElementById('userRole').value
-            };
-
-            fetch(`${API_BASE_URL}/api/users`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(newUser)
-            })
-            .then(res => res.json())
-            .then(data => {
-                if (data.success) {
-                    alert('Usuário cadastrado com sucesso!');
-                    form.reset();
-                    loadUsersList();
-                } else {
-                    alert(data.message || 'Erro ao cadastrar usuário.');
-                }
-            })
-            .catch(() => alert('Erro na comunicação com o servidor.'));
+            });
         }
 
         function editUser(id, currentName, currentUsername, currentRole) {
@@ -590,6 +558,7 @@
             if (tabId === 'mapa') setTimeout(initMap, 200);
         }
 
+        // CARREGAMENTO DE TODOS OS CLIENTES DA ROTA PADRÃO /api/clients
         function loadClients() {
             fetch(`${API_BASE_URL}/api/clients`)
             .then(res => {
@@ -774,31 +743,22 @@
         }
 
         function startVisit(visitId) {
-            if (!navigator.geolocation) {
-                return alert('Geolocalização não é suportada por este navegador.');
-            }
-
             navigator.geolocation.getCurrentPosition(pos => {
                 fetch(`${API_BASE_URL}/api/visits/${visitId}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         status: 'Em Andamento',
-                        startTime: new Date().toISOString(),
-                        latitude: pos.coords.latitude,
-                        longitude: pos.coords.longitude
+                        startTime: new Date().toLocaleTimeString(),
+                        startLat: pos.coords.latitude,
+                        startLng: pos.coords.longitude
                     })
-                })
-                .then(res => res.json())
-                .then(() => {
-                    alert('Visita iniciada!');
-                    loadVisits();
-                });
-            }, err => alert('Erro ao capturar localização GPS. Verifique a permissão do seu navegador.'));
+                }).then(() => loadVisits());
+            }, () => alert('Erro no GPS.'));
         }
 
         function endVisit(visitId) {
-            const notes = prompt("Insira as observações da visita:");
+            const notes = prompt("Digite uma observação sobre a visita:");
             if (notes === null) return;
 
             navigator.geolocation.getCurrentPosition(pos => {
@@ -807,49 +767,13 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         status: 'Concluída',
-                        endTime: new Date().toISOString(),
                         notes: notes,
-                        latitude: pos.coords.latitude,
-                        longitude: pos.coords.longitude
+                        endTime: new Date().toLocaleTimeString(),
+                        endLat: pos.coords.latitude,
+                        endLng: pos.coords.longitude
                     })
-                })
-                .then(res => res.json())
-                .then(() => {
-                    alert('Visita finalizada com sucesso!');
-                    loadVisits();
-                });
-            }, err => alert('Erro ao obter GPS no fechamento. Verifique a localização.'));
-        }
-
-        function toggleLiveTracking() {
-            const statusDiv = document.getElementById('trackingStatus');
-            const btn = document.getElementById('btnLiveTracking');
-
-            if (trackingWatchId !== null) {
-                navigator.geolocation.clearWatch(trackingWatchId);
-                trackingWatchId = null;
-                statusDiv.innerText = "Rastreamento GPS: Desativado";
-                btn.innerText = "Ativar Rastreamento em Tempo Real";
-                btn.className = "btn btn-success";
-            } else {
-                if (!navigator.geolocation) return alert('GPS não suportado.');
-                
-                trackingWatchId = navigator.geolocation.watchPosition(pos => {
-                    statusDiv.innerText = `Rastreamento GPS: Ativo (Lat: ${pos.coords.latitude.toFixed(4)}, Lng: ${pos.coords.longitude.toFixed(4)})`;
-                    fetch(`${API_BASE_URL}/api/location`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            userId: currentUser.id,
-                            latitude: pos.coords.latitude,
-                            longitude: pos.coords.longitude
-                        })
-                    }).catch(() => {});
-                }, err => alert('Permissão de GPS negada.'), { enableHighAccuracy: true });
-
-                btn.innerText = "Desativar Rastreamento";
-                btn.className = "btn btn-danger";
-            }
+                }).then(() => loadVisits());
+            }, () => alert('Erro no GPS.'));
         }
 
         function setTodayFilter() {
@@ -862,84 +786,146 @@
         function loadReport() {
             const start = document.getElementById('reportStartDate').value;
             const end = document.getElementById('reportEndDate').value;
-            const seller = document.getElementById('reportSellerSelect').value;
+            
+            let sellerId = currentUser.id;
+            if (currentUser.role === 'Supervisor' || currentUser.role === 'Administrador') {
+                sellerId = document.getElementById('reportSellerSelect').value;
+            }
 
-            fetch(`${API_BASE_URL}/api/reports?start=${start}&end=${end}&sellerId=${seller}`)
-            .then(async res => {
-                if (!res.ok) {
-                    const errData = await res.json().catch(() => ({}));
-                    throw new Error(errData.message || `Erro do servidor (${res.status})`);
-                }
-                return res.json();
-            })
+            fetch(`${API_BASE_URL}/api/reports/summary?startDate=${start}&endDate=${end}&sellerId=${sellerId}&userRole=${currentUser.role}`)
+            .then(res => res.json())
             .then(data => {
-                document.getElementById('metricTotal').innerText = data.total || data.totalVisits || 0;
-                document.getElementById('metricCompleted').innerText = data.completed || 0;
-                document.getElementById('metricInProgress').innerText = data.inProgress || 0;
-                document.getElementById('metricScheduled').innerText = data.scheduled || 0;
+                document.getElementById('metricTotal').innerText = data.totalVisits;
+                document.getElementById('metricCompleted').innerText = data.completed;
+                document.getElementById('metricInProgress').innerText = data.inProgress;
+                document.getElementById('metricScheduled').innerText = data.scheduled;
 
                 const tbody = document.getElementById('reportTableBody');
-                if (!data.visits || data.visits.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="8" style="text-align: center;">Nenhuma visita encontrada no período.</td></tr>';
+
+                if (data.visits.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="8" style="text-align: center;">Nenhuma visita encontrada para o período informado.</td></tr>';
                     return;
                 }
 
-                let rows = '';
+                let rowsHtml = '';
                 data.visits.forEach(v => {
-                    const gpsLink = (v.latitude && v.longitude) 
-                        ? `<a href="https://maps.google.com/?q=${v.latitude},${v.longitude}" target="_blank" class="map-link">Ver no Mapa</a>` 
-                        : 'Não registrado';
+                    let locationText = 'Sem Registro GPS';
+                    
+                    if (v.startLat && v.startLng) {
+                        const googleMapsUrl = `https://www.google.com/maps?q=${v.startLat},${v.startLng}`;
+                        locationText = `<a href="${googleMapsUrl}" target="_blank" class="map-link">📍 Ver no Mapa (${v.startLat.toFixed(4)}, ${v.startLng.toFixed(4)})</a>`;
+                    }
 
-                    rows += `
+                    rowsHtml += `
                         <tr>
-                            <td>${v.scheduledDate || '-'}</td>
-                            <td>${v.clientName || '-'}</td>
-                            <td>${v.sellerName || '-'}</td>
-                            <td>${v.status || '-'}</td>
+                            <td>${v.scheduledDate}</td>
+                            <td>${v.clientName}</td>
+                            <td>${v.sellerName}</td>
+                            <td><strong>${v.status}</strong></td>
                             <td>${v.notes || '-'}</td>
-                            <td>${v.startTime ? new Date(v.startTime).toLocaleTimeString() : '-'}</td>
-                            <td>${v.endTime ? new Date(v.endTime).toLocaleTimeString() : '-'}</td>
-                            <td>${gpsLink}</td>
+                            <td>${v.startTime || '-'}</td>
+                            <td>${v.endTime || '-'}</td>
+                            <td>${locationText}</td>
                         </tr>
                     `;
                 });
-                tbody.innerHTML = rows;
-            })
-            .catch(err => {
-                console.error(err);
-                alert(err.message);
+                tbody.innerHTML = rowsHtml;
             });
+        }
+
+        function toggleLiveTracking() {
+            const btn = document.getElementById('btnLiveTracking');
+            const status = document.getElementById('trackingStatus');
+
+            if (trackingWatchId) {
+                navigator.geolocation.clearWatch(trackingWatchId);
+                trackingWatchId = null;
+                btn.innerText = 'Ativar Rastreamento em Tempo Real';
+                status.innerText = 'Rastreamento GPS: Desativado';
+            } else {
+                trackingWatchId = navigator.geolocation.watchPosition(pos => {
+                    status.innerText = `Rastreamento Ativo (${pos.coords.latitude.toFixed(4)}, ${pos.coords.longitude.toFixed(4)})`;
+                    fetch(`${API_BASE_URL}/api/tracking/update`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            sellerId: currentUser.id,
+                            sellerName: currentUser.name,
+                            lat: pos.coords.latitude,
+                            lng: pos.coords.longitude
+                        })
+                    });
+                }, err => alert('Erro GPS: ' + err.message), { enableHighAccuracy: true });
+
+                btn.innerText = 'Desativar Rastreamento';
+            }
         }
 
         function initMap() {
             if (!map) {
-                map = L.map('map').setView([-15.77972, -47.92972], 4);
-                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                    maxZoom: 19,
-                    attribution: '© OpenStreetMap'
-                }).addTo(map);
+                map = L.map('map').setView([-14.2350, -51.9253], 4);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap' }).addTo(map);
             }
+            updateMapLocations();
+        }
 
-            mapMarkers.forEach(m => map.removeLayer(m));
-            mapMarkers = [];
-
-            fetch(`${API_BASE_URL}/api/locations/live`)
+        function updateMapLocations() {
+            fetch(`${API_BASE_URL}/api/tracking/active`)
             .then(res => res.json())
             .then(locations => {
-                if (!locations || locations.length === 0) return;
+                mapMarkers.forEach(m => map.removeLayer(m));
+                mapMarkers = [];
 
-                const bounds = [];
                 locations.forEach(loc => {
-                    const marker = L.marker([loc.latitude, loc.longitude])
-                        .addTo(map)
-                        .bindPopup(`<b>${loc.userName}</b><br>Última atualização: ${new Date(loc.timestamp).toLocaleTimeString()}`);
+                    const marker = L.marker([loc.lat, loc.lng]).addTo(map)
+                        .bindPopup(`<b>Vendedor: ${loc.sellerName}</b><br>Atualizado: ${new Date(loc.timestamp).toLocaleTimeString()}`);
                     mapMarkers.push(marker);
-                    bounds.push([loc.latitude, loc.longitude]);
                 });
+            });
 
-                if (bounds.length > 0) map.fitBounds(bounds);
+            fetch(`${API_BASE_URL}/api/visits?sellerId=${currentUser.id}&userRole=${currentUser.role}`)
+            .then(res => res.json())
+            .then(visits => {
+                visits.forEach(v => {
+                    if (v.startLat && v.startLng) {
+                        const marker = L.marker([v.startLat, v.startLng], { opacity: 0.7 }).addTo(map)
+                            .bindPopup(`<b>Visita: ${v.clientName}</b><br>Endereço: ${v.clientAddress || 'Não informado'}<br>Status: ${v.status}<br>Vendedor: ${v.sellerName}`);
+                        mapMarkers.push(marker);
+                    }
+                });
+            });
+        }
+
+        function handleCreateUser(e) {
+            e.preventDefault();
+            const form = e.target;
+
+            fetch(`${API_BASE_URL}/api/users`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name: document.getElementById('userName').value,
+                    username: document.getElementById('userUsername').value,
+                    password: document.getElementById('userPassword').value,
+                    role: document.getElementById('userRole').value
+                })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Usuário cadastrado com sucesso!');
+                    form.reset();
+                    loadUsersList();
+                } else {
+                    alert(data.message);
+                }
             });
         }
     </script>
+
+    <footer>
+        Desenvolvido por Marciano Chibanca
+    </footer>
+
 </body>
 </html>
