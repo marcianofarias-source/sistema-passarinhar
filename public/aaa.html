@@ -378,23 +378,6 @@
                     <button type="submit" class="btn">Cadastrar Usuário</button>
                 </form>
             </div>
-
-            <div class="card">
-                <h3>Lista de Vendedores / Usuários</h3>
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Nome</th>
-                            <th>Usuário (Login)</th>
-                            <th>Perfil</th>
-                            <th>Ações</th>
-                        </tr>
-                    </thead>
-                    <tbody id="usersTableBody">
-                        <tr><td colspan="4" style="text-align: center;">Carregando usuários...</td></tr>
-                    </tbody>
-                </table>
-            </div>
         </div>
 
     </div>
@@ -489,59 +472,7 @@
                 agendaFilter.innerHTML = optionsHtml;
                 reportFilter.innerHTML = optionsHtml;
                 visitSellerSelect.innerHTML = sellersOptionsHtml;
-
-                // Preenche a Tabela de Gerenciamento de Usuários
-                const usersTbody = document.getElementById('usersTableBody');
-                if (usersTbody) {
-                    let rowsHtml = '';
-                    users.forEach(u => {
-                        rowsHtml += `
-                            <tr>
-                                <td>${u.name}</td>
-                                <td>${u.username}</td>
-                                <td>${u.role}</td>
-                                <td>
-                                    <button class="btn btn-outline" style="padding: 4px 10px; font-size: 12px;" onclick="editUser(${u.id}, '${u.name}', '${u.username}', '${u.role}')">
-                                        ✏️ Editar
-                                    </button>
-                                </td>
-                            </tr>
-                        `;
-                    });
-                    usersTbody.innerHTML = rowsHtml || '<tr><td colspan="4" style="text-align: center;">Nenhum usuário cadastrado.</td></tr>';
-                }
             });
-        }
-
-        function editUser(id, currentName, currentUsername, currentRole) {
-            const newName = prompt("Alterar Nome:", currentName);
-            if (newName === null || !newName.trim()) return;
-
-            const newUsername = prompt("Alterar Usuário (Login):", currentUsername);
-            if (newUsername === null || !newUsername.trim()) return;
-
-            const newRole = prompt("Alterar Perfil (Vendedor, Supervisor, Administrador):", currentRole);
-            if (newRole === null || !newRole.trim()) return;
-
-            fetch(`${API_BASE_URL}/api/users/${id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    name: newName.trim(),
-                    username: newUsername.trim(),
-                    role: newRole.trim()
-                })
-            })
-            .then(res => res.json())
-            .then(data => {
-                if (data.success) {
-                    alert('Cadastro do usuário atualizado com sucesso!');
-                    loadUsersList();
-                } else {
-                    alert(data.message || 'Erro ao alterar usuário.');
-                }
-            })
-            .catch(() => alert('Erro na comunicação com o servidor.'));
         }
 
         function switchTab(tabId) {
@@ -563,6 +494,7 @@
                 globalClientsList = clients;
                 const tbody = document.getElementById('clientsTableBody');
                 
+                // Renderização em lote do DOM
                 let rows = '';
                 const renderLimit = Math.min(clients.length, 100);
                 for (let i = 0; i < renderLimit; i++) {
