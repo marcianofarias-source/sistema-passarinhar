@@ -143,8 +143,8 @@ app.put('/api/users/:id', async (req, res) => {
 // ROTAS DE CLIENTES
 app.get('/api/clients', async (req, res) => {
     try {
-        // Removida a trava do .limit() para retornar TODOS os clientes salvos no banco de dados
-        const clients = await Client.find().sort({ id: -1 }).lean();
+        const limit = parseInt(req.query.limit) || 0;
+        const clients = await Client.find().sort({ id: -1 }).limit(limit).lean();
         res.json(clients);
     } catch (error) {
         res.status(500).json({ success: false, message: 'Erro ao buscar clientes' });
