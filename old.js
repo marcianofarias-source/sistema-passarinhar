@@ -3,7 +3,6 @@ const cors = require('cors');
 const mongoose = require('mongoose');
 const multer = require('multer');
 const xlsx = require('xlsx');
-const fs = require('fs');
 
 const app = express();
 const upload = multer({ dest: 'uploads/' });
@@ -18,32 +17,31 @@ mongoose.connect(MONGO_URI)
   .then(() => console.log('Conectado ao MongoDB Atlas com sucesso!'))
   .catch(err => console.error('Erro ao conectar ao MongoDB:', err));
 
-// Schemas Otimizados com Índices
 const userSchema = new mongoose.Schema({
-    id: { type: Number, index: true },
+    id: Number,
     name: String,
-    username: { type: String, unique: true, index: true },
+    username: { type: String, unique: true },
     password: String,
     role: String
 });
 
 const clientSchema = new mongoose.Schema({
-    id: { type: Number, index: true },
-    name: { type: String, index: true },
+    id: Number,
+    name: String,
     city: String,
     address: String,
     phone: String
 });
 
 const visitSchema = new mongoose.Schema({
-    id: { type: Number, index: true },
+    id: Number,
     clientId: String,
     clientName: String,
     clientAddress: String,
-    scheduledDate: { type: String, index: true },
-    sellerId: { type: String, index: true },
+    scheduledDate: String,
+    sellerId: String,
     sellerName: String,
-    status: { type: String, default: 'Agendada', index: true },
+    status: { type: String, default: 'Agendada' },
     notes: String,
     startTime: String,
     endTime: String,
@@ -60,7 +58,7 @@ const Visit = mongoose.model('Visit', visitSchema);
 let activeLocations = {};
 
 async function initAdmin() {
-    const adminExists = await User.findOne({ username: 'admin' }).select('_id').lean();
+    const adminExists = await User.findOne({ username: 'admin' });
     if (!adminExists) {
         await User.create({
             id: 1,
@@ -75,31 +73,27 @@ async function initAdmin() {
 initAdmin();
 
 app.post('/api/login', async (req, res) => {
-    try {
-        const { username, password } = req.body;
-        const user = await User.findOne({ 
-            username: new RegExp(`^${username.trim()}$`, 'i'), 
-            password: password 
-        }).select('id name role').lean();
-        
-        if (user) {
-            res.json({ success: true, user: { id: user.id, name: user.name, role: user.role } });
-        } else {
-            res.status(401).json({ success: false, message: 'Usuário ou senha incorretos!' });
-        }
-    } catch (e) {
-        res.status(500).json({ success: false, message: 'Erro no servidor' });
+    const { username, password } = req.body;
+    const user = await User.findOne({ 
+        username: new RegExp(`^${username.trim()}$`, 'i'), 
+        password: password 
+    });
+    
+    if (user) {
+        res.json({ success: true, user: { id: user.id, name: user.name, role: user.role } });
+    } else {
+        res.status(401).json({ success: false, message: 'Usuário ou senha incorretos!' });
     }
 });
 
 app.get('/api/users', async (req, res) => {
-    const users = await User.find({}, { password: 0 }).lean();
+    const users = await User.find({}, { password: 0 });
     res.json(users);
 });
 
 app.post('/api/users', async (req, res) => {
     try {
-        const exists = await User.findOne({ username: new RegExp(`^${req.body.username.trim()}$`, 'i') }).select('_id').lean();
+        const exists = await User.findOne({ username: new RegExp(`^${req.body.username.trim()}$`, 'i') });
         if (exists) {
             return res.status(400).json({ success: false, message: 'Nome de usuário já existe!' });
         }
@@ -112,15 +106,14 @@ app.post('/api/users', async (req, res) => {
             role: req.body.role
         });
 
-        res.json({ success: true, user: { id: newUser.id, name: newUser.name, role: newUser.role } });
+        res.json({ success: true, user: newUser });
     } catch (e) {
         res.status(500).json({ success: false, message: 'Erro ao cadastrar usuário' });
     }
 });
 
 app.get('/api/clients', async (req, res) => {
-    const limit = parseInt(req.query.limit) || 500;
-    const clients = await Client.find().limit(limit).lean();
+    const clients = await Client.find();
     res.json(clients);
 });
 
@@ -143,20 +136,17 @@ app.post('/api/clients/import', upload.single('file'), async (req, res) => {
         const sheet = workbook.Sheets[workbook.SheetNames[0]];
         const data = xlsx.utils.sheet_to_json(sheet);
 
-        const baseTimestamp = Date.now();
-        const clientsToInsert = data.map((row, index) => ({
-            id: baseTimestamp + index,
+        const clientsToInsert = data.map(row => ({
+            id: Date.now() + Math.floor(Math.random() * 10000),
             name: row.Nome || row.nome || row.Name || '',
             city: row.Cidade || row.cidade || row.City || '',
             address: row.Endereço || row.Endereco || row.address || '',
             phone: row.Telefone || row.telefone || row.Phone || ''
         }));
 
-        await Client.insertMany(clientsToInsert, { ordered: false });
-        fs.unlinkSync(req.file.path);
+        await Client.insertMany(clientsToInsert);
         res.json({ success: true, count: data.length });
     } catch (error) {
-        if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
         res.status(500).json({ success: false, message: 'Erro ao processar Excel' });
     }
 });
@@ -181,12 +171,12 @@ app.get('/api/visits', async (req, res) => {
         filter.sellerId = sellerId;
     }
     
-    const visits = await Visit.find(filter).lean();
+    const visits = await Visit.find(filter);
     res.json(visits);
 });
 
 app.post('/api/visits', async (req, res) => {
-    const client = await Client.findOne({ id: req.body.clientId }).select('name address').lean();
+    const client = await Client.findOne({ id: req.body.clientId });
 
     const newVisit = await Visit.create({
         id: Date.now(),
@@ -203,7 +193,7 @@ app.post('/api/visits', async (req, res) => {
 });
 
 app.put('/api/visits/:id', async (req, res) => {
-    const visit = await Visit.findOneAndUpdate({ id: req.params.id }, req.body, { new: true }).lean();
+    const visit = await Visit.findOneAndUpdate({ id: req.params.id }, req.body, { new: true });
     if (visit) {
         res.json({ success: true, visit });
     } else {
@@ -228,22 +218,14 @@ app.get('/api/reports/summary', async (req, res) => {
         filter.scheduledDate = { $gte: startDate, $lte: endDate };
     }
 
-    const visits = await Visit.find(filter).lean();
-
-    let completed = 0, inProgress = 0, scheduled = 0;
-    for (let i = 0; i < visits.length; i++) {
-        const st = visits[i].status;
-        if (st === 'Concluída') completed++;
-        else if (st === 'Em Andamento') inProgress++;
-        else if (st === 'Agendada') scheduled++;
-    }
+    const visits = await Visit.find(filter);
 
     res.json({
         totalVisits: visits.length,
-        completed,
-        inProgress,
-        scheduled,
-        visits
+        completed: visits.filter(v => v.status === 'Concluída').length,
+        inProgress: visits.filter(v => v.status === 'Em Andamento').length,
+        scheduled: visits.filter(v => v.status === 'Agendada').length,
+        visits: visits
     });
 });
 
