@@ -193,6 +193,32 @@ app.post('/api/clients/import', upload.single('file'), async (req, res) => {
     }
 });
 
+app.post('/api/clients/import', upload.single('file'), async (req, res) => {
+    if (!req.file) return res.status(400).json({ success: false, message: 'Nenhum arquivo enviado' });
+
+    try {
+        const workbook = xlsx.readFile(req.file.path);
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const data = xlsx.utils.sheet_to_json(sheet);
+
+        const baseTimestamp = Date.now();
+        const clientsToInsert = data.map((row, index) => ({
+            id: baseTimestamp + index,
+            name: row.Nome || row.nome || row.Name || '',
+            city: row.Cidade || row.cidade || row.City || '',
+            address: row.Endereço || row.Endereco || row.address || '',
+            phone: row.Telefone || row.telefone || row.Phone || ''
+        }));
+
+        await Client.insertMany(clientsToInsert, { ordered: false });
+        fs.unlinkSync(req.file.path);
+        res.json({ success: true, count: data.length });
+    } catch (error) {
+        if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+        res.status(500).json({ success: false, message: 'Erro ao processar Excel' });
+    }
+});
+
 app.post('/api/tracking/update', (req, res) => {
     const { sellerId, sellerName, lat, lng } = req.body;
     activeLocations[sellerId] = {
