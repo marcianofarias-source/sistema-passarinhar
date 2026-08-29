@@ -730,7 +730,7 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         status: 'Em Andamento',
-                        startTime: new Date().toLocaleTimeString(),
+                        startTime: new Date().toLocaleString('pt-BR'),
                         startLat: pos.coords.latitude,
                         startLng: pos.coords.longitude
                     })
@@ -749,7 +749,7 @@
                     body: JSON.stringify({
                         status: 'Concluída',
                         notes: notes,
-                        endTime: new Date().toLocaleTimeString(),
+                        endTime: new Date().toLocaleString('pt-BR'),
                         endLat: pos.coords.latitude,
                         endLng: pos.coords.longitude
                     })

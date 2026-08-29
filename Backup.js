@@ -140,21 +140,57 @@ app.put('/api/users/:id', async (req, res) => {
     }
 });
 
-app.get('/api/clients', async (req, res) => {
-    const limit = parseInt(req.query.limit) || 500;
-    const clients = await Client.find().limit(limit).lean();
-    res.json(clients);
-});
+app.post('/api/clients/import', upload.single('file'), async (req, res) => {
+    if (!req.file) return res.status(400).json({ success: false, message: 'Nenhum arquivo enviado' });
 
-app.post('/api/clients', async (req, res) => {
-    const newClient = await Client.create({
-        id: Date.now(),
-        name: req.body.name,
-        city: req.body.city,
-        address: req.body.address || '',
-        phone: req.body.phone || ''
-    });
-    res.json({ success: true, client: newClient });
+    try {
+        const workbook = xlsx.readFile(req.file.path);
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const data = xlsx.utils.sheet_to_json(sheet);
+
+        const baseTimestamp = Date.now();
+
+        // Mapeador flexível de colunas
+        const getValue = (row, possibleKeys) => {
+            for (const key of Object.keys(row)) {
+                const cleanKey = key.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                if (possibleKeys.includes(cleanKey)) {
+                    return String(row[key] || '').trim();
+                }
+            }
+            return '';
+        };
+
+        const clientsToInsert = data
+            .map((row, index) => {
+                const name = getValue(row, ['nome do cliente', 'nome', 'name', 'cliente', 'razao social']);
+                const city = getValue(row, ['cidade', 'city', 'municipio']);
+                const address = getValue(row, ['endereco', 'address', 'rua', 'logradouro']);
+                const phone = getValue(row, ['fone resid', 'telefone', 'fone', 'phone', 'celular']);
+
+                return {
+                    id: baseTimestamp + index,
+                    name,
+                    city,
+                    address,
+                    phone
+                };
+            })
+            .filter(client => client.name !== '' || client.city !== '');
+
+        if (clientsToInsert.length === 0) {
+            fs.unlinkSync(req.file.path);
+            return res.status(400).json({ success: false, message: 'Nenhum cliente válido encontrado.' });
+        }
+
+        await Client.insertMany(clientsToInsert, { ordered: false });
+        fs.unlinkSync(req.file.path);
+        
+        res.json({ success: true, count: clientsToInsert.length });
+    } catch (error) {
+        if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+        res.status(500).json({ success: false, message: 'Erro ao processar arquivo: ' + error.message });
+    }
 });
 
 app.post('/api/clients/import', upload.single('file'), async (req, res) => {
