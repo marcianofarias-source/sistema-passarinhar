@@ -260,7 +260,7 @@
             </div>
 
             <div class="card">
-                <h3>Lista de Clientes</h3>
+                <h3>Lista de Clientes (<span id="clientCounter">0</span>)</h3>
                 <table>
                     <thead>
                         <tr>
@@ -490,7 +490,6 @@
                 reportFilter.innerHTML = optionsHtml;
                 visitSellerSelect.innerHTML = sellersOptionsHtml;
 
-                // Preenche a Tabela de Gerenciamento de Usuários
                 const usersTbody = document.getElementById('usersTableBody');
                 if (usersTbody) {
                     let rowsHtml = '';
@@ -556,28 +555,38 @@
             if (tabId === 'mapa') setTimeout(initMap, 200);
         }
 
+        // CARREGAMENTO OTIMIZADO DE TODOS OS CLIENTES (SEM TRAVAR A TELA)
         function loadClients() {
             fetch(`${API_BASE_URL}/api/clients`)
             .then(res => res.json())
             .then(clients => {
                 globalClientsList = clients;
-                const tbody = document.getElementById('clientsTableBody');
                 
-                let rows = '';
+                const counterEl = document.getElementById('clientCounter');
+                if (counterEl) counterEl.innerText = clients.length;
+
+                const tbody = document.getElementById('clientsTableBody');
+                const fragment = document.createDocumentFragment();
+
                 for (let i = 0; i < clients.length; i++) {
                     const c = clients[i];
-                    rows += `<tr>
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
                         <td>${c.id || '-'}</td>
                         <td>${c.name || '-'}</td>
                         <td>${c.city || '-'}</td>
                         <td>${c.address || '-'}</td>
                         <td>${c.phone || '-'}</td>
-                    </tr>`;
+                    `;
+                    fragment.appendChild(tr);
                 }
-                tbody.innerHTML = rows;
+
+                tbody.innerHTML = '';
+                tbody.appendChild(fragment);
 
                 renderClientSelectOptions(clients.slice(0, 100));
-            });
+            })
+            .catch(err => console.error('Erro ao carregar clientes:', err));
         }
 
         function renderClientSelectOptions(clients) {
