@@ -140,6 +140,37 @@ app.put('/api/users/:id', async (req, res) => {
     }
 });
 
+// ==========================================
+// ROTAS DE CLIENTES (CORRIGIDO / ADICIONADO)
+// ==========================================
+
+// GET: Buscar todos os clientes
+app.get('/api/clients', async (req, res) => {
+    try {
+        const clients = await Client.find({}).lean();
+        res.json(clients);
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Erro ao buscar clientes' });
+    }
+});
+
+// POST: Cadastrar um novo cliente manualmente
+app.post('/api/clients', async (req, res) => {
+    try {
+        const newClient = await Client.create({
+            id: Date.now(),
+            name: req.body.name,
+            city: req.body.city,
+            address: req.body.address,
+            phone: req.body.phone
+        });
+        res.json({ success: true, client: newClient });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Erro ao cadastrar cliente' });
+    }
+});
+
+// POST: Importar clientes via Excel (.xlsx)
 app.post('/api/clients/import', upload.single('file'), async (req, res) => {
     if (!req.file) return res.status(400).json({ success: false, message: 'Nenhum arquivo enviado' });
 
@@ -193,31 +224,9 @@ app.post('/api/clients/import', upload.single('file'), async (req, res) => {
     }
 });
 
-app.post('/api/clients/import', upload.single('file'), async (req, res) => {
-    if (!req.file) return res.status(400).json({ success: false, message: 'Nenhum arquivo enviado' });
-
-    try {
-        const workbook = xlsx.readFile(req.file.path);
-        const sheet = workbook.Sheets[workbook.SheetNames[0]];
-        const data = xlsx.utils.sheet_to_json(sheet);
-
-        const baseTimestamp = Date.now();
-        const clientsToInsert = data.map((row, index) => ({
-            id: baseTimestamp + index,
-            name: row.Nome || row.nome || row.Name || '',
-            city: row.Cidade || row.cidade || row.City || '',
-            address: row.Endereço || row.Endereco || row.address || '',
-            phone: row.Telefone || row.telefone || row.Phone || ''
-        }));
-
-        await Client.insertMany(clientsToInsert, { ordered: false });
-        fs.unlinkSync(req.file.path);
-        res.json({ success: true, count: data.length });
-    } catch (error) {
-        if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
-        res.status(500).json({ success: false, message: 'Erro ao processar Excel' });
-    }
-});
+// ==========================================
+// ROTAS DE RASTREAMENTO E VISITAS
+// ==========================================
 
 app.post('/api/tracking/update', (req, res) => {
     const { sellerId, sellerName, lat, lng } = req.body;
