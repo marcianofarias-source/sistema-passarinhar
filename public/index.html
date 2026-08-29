@@ -604,19 +604,28 @@
             select.innerHTML = options;
         }
 
+        // FUNÇÃO DE BUSCA CORRIGIDA (BUSCA EM TODOS OS CLIENTES SEM TRAVAR)
         function filterClientOptionsFast() {
             clearTimeout(searchTimeout);
             searchTimeout = setTimeout(() => {
                 const searchTerm = document.getElementById('searchClientInput').value.toLowerCase().trim();
+                
+                // Se o campo estiver vazio, carrega os 100 primeiros clientes padrão
                 if (!searchTerm) {
                     renderClientSelectOptions(globalClientsList.slice(0, 100));
                     return;
                 }
-                const filtered = globalClientsList.filter(c => 
-                    (c.name && c.name.toLowerCase().includes(searchTerm)) || 
-                    (c.city && c.city.toLowerCase().includes(searchTerm))
-                ).slice(0, 100);
-                renderClientSelectOptions(filtered);
+
+                // Filtra em TODOS os clientes cadastrados no banco (sem usar slice antes)
+                const filtered = globalClientsList.filter(c => {
+                    const nameMatch = c.name && c.name.toLowerCase().includes(searchTerm);
+                    const cityMatch = c.city && c.city.toLowerCase().includes(searchTerm);
+                    const addressMatch = c.address && c.address.toLowerCase().includes(searchTerm);
+                    return nameMatch || cityMatch || addressMatch;
+                });
+
+                // Limita a exibição aos 100 primeiros correspondentes encontrados
+                renderClientSelectOptions(filtered.slice(0, 100));
             }, 150);
         }
 
