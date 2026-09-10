@@ -602,38 +602,32 @@
                 const counterEl = document.getElementById('clientCounter');
                 if (counterEl) counterEl.innerText = clients.length;
 
-                renderClientsTable(clients.slice(0, 100));
+                const tbody = document.getElementById('clientsTableBody');
+                const fragment = document.createDocumentFragment();
+
+                for (let i = 0; i < clients.length; i++) {
+                    const c = clients[i];
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${c.id || '-'}</td>
+                        <td>${c.name || '-'}</td>
+                        <td>${c.city || '-'}</td>
+                        <td>${c.address || '-'}</td>
+                        <td>${c.phone || '-'}</td>
+                    `;
+                    fragment.appendChild(tr);
+                }
+
+                tbody.innerHTML = '';
+                tbody.appendChild(fragment);
+
                 renderClientSelectOptions(clients.slice(0, 100));
             })
             .catch(err => console.error('Erro ao carregar clientes:', err));
         }
 
-        function renderClientsTable(clients) {
-            const tbody = document.getElementById('clientsTableBody');
-            if (!tbody) return;
-
-            const fragment = document.createDocumentFragment();
-            for (let i = 0; i < clients.length; i++) {
-                const c = clients[i];
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td>${c.id || '-'}</td>
-                    <td>${c.name || '-'}</td>
-                    <td>${c.city || '-'}</td>
-                    <td>${c.address || '-'}</td>
-                    <td>${c.phone || '-'}</td>
-                `;
-                fragment.appendChild(tr);
-            }
-
-            tbody.innerHTML = '';
-            tbody.appendChild(fragment);
-        }
-
         function renderClientSelectOptions(clients) {
             const select = document.getElementById('visitClientSelect');
-            if (!select) return;
-
             if (!clients || clients.length === 0) {
                 select.innerHTML = '<option value="">Nenhum cliente encontrado</option>';
                 return;
@@ -654,7 +648,6 @@
                 
                 if (!searchTerm) {
                     renderClientSelectOptions(globalClientsList.slice(0, 100));
-                    renderClientsTable(globalClientsList.slice(0, 100));
                     return;
                 }
 
@@ -666,7 +659,6 @@
                 });
 
                 renderClientSelectOptions(filtered.slice(0, 100));
-                renderClientsTable(filtered.slice(0, 100));
             }, 150);
         }
 
